@@ -1,0 +1,38 @@
+# ── Web framework ──
+fastapi                    # Your API server
+uvicorn[standard]          # Runs FastAPI (ASGI server)
+python-dotenv              # Reads .env files
+python-multipart           # Handles file uploads in FastAPI
+
+# ── Database ──
+sqlalchemy[asyncio]        # ORM (talks to Postgres in Python)
+asyncpg                    # Async Postgres driver
+pgvector                   # Vector search extension for SQLAlchemy
+alembic                    # Database migrations (version control for DB schema)
+
+# ── Auth ──
+python-jose[cryptography]  # JWT token creation/validation
+passlib[bcrypt]            # Password hashing
+bcrypt==4.0.1              # bcrypt backend
+
+# ── AI / LLM (via LangChain) ──
+langchain                  # LLM orchestration framework
+langchain-anthropic        # Claude integration for LangChain
+langchain-openai           # OpenAI embeddings for LangChain
+langchain-community        # Extra tools and integrations
+
+# ── File processing ──
+PyMuPDF                    # PDF text extraction
+
+# ── Background jobs ──
+celery[redis]              # Task queue
+redis                      # Redis client
+
+# ── Frontend ──
+streamlit                  # UI framework
+
+# ── Dev & testing ──
+httpx                      # Async HTTP client for testing
+pytest                     # Test runner
+pytest-asyncio             # Async test support
+pydantic[email]
