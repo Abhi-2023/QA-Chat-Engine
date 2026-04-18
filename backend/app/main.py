@@ -4,6 +4,7 @@ from backend.app.core.database import init_db
 from backend.app.models.user import User
 from backend.app.models.conversation import Conversation, Message
 from backend.app.api.auth import router as auth_router
+from backend.app.api.chat import router as chat_router
 
 settings = get_settings()
 app = FastAPI(
@@ -13,7 +14,7 @@ app = FastAPI(
 )
 
 app.include_router(auth_router)
-
+app.include_router(chat_router)
 
 @app.get("/health")
 async def health_check():
