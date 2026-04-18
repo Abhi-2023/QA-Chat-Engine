@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from backend.app.core.config import get_settings
 from backend.app.core.database import init_db
 from backend.app.models.user import User
+from backend.app.models.conversation import Conversation, Message
 from backend.app.api.auth import router as auth_router
 
 settings = get_settings()
