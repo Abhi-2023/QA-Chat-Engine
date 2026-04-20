@@ -5,6 +5,9 @@ from backend.app.models.user import User
 from backend.app.models.conversation import Conversation, Message
 from backend.app.api.auth import router as auth_router
 from backend.app.api.chat import router as chat_router
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from backend.app.api.api_pages import router as pages_router
 
 settings = get_settings()
 app = FastAPI(
@@ -13,8 +16,17 @@ app = FastAPI(
     description='Multimodel AI assistant'
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
+
 app.include_router(auth_router)
 app.include_router(chat_router)
+app.include_router(pages_router)
 
 @app.get("/health")
 async def health_check():

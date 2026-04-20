@@ -13,4 +13,4 @@ class User(Base):
     plan:Mapped[str] = mapped_column(String(20), default='free')
     is_active:Mapped[bool] = mapped_column(Boolean, default=True)
     created_at:Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    conversations= relationship("Conversation", back_populates='user')
+    conversations= relationship("Conversation", back_populates='user', cascade='all, delete-orphan')

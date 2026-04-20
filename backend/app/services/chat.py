@@ -3,7 +3,8 @@ from langchain_core.messages import SystemMessage, AIMessage, HumanMessage
 from backend.app.core.config import get_settings
 import json
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.app.models.conversation import Message
+from backend.app.models.conversation import Message, Conversation
+from sqlalchemy import select, update
 
 settings = get_settings()
 llm = ChatAnthropic(model="claude-sonnet-4-20250514", streaming=True, api_key=settings.ANTHROPIC_API_KEY)
@@ -27,7 +28,7 @@ async def stream_chat_response(messages, conversation_id, db: AsyncSession):
         full_response=""
         async for chunk in llm.astream(formatted):
             full_response += chunk.content
-            yield f"data : {json.dumps({'type':'token', 'content':chunk.content})}\n\n"
+            yield f"data: {json.dumps({'type': 'token', 'content': chunk.content})}\n\n"
             
         new_message = Message(
             conversation_id = conversation_id,
@@ -36,8 +37,19 @@ async def stream_chat_response(messages, conversation_id, db: AsyncSession):
         )
         
         db.add(new_message)
+        # After db.add(new_message), update the conversation title
+        if len(messages) <= 1:  # first message in conversation            
+            # Use first 50 chars of user's message as title
+            first_msg = messages[0].content if messages else "New chat"
+            title = first_msg[:50] + ("..." if len(first_msg) > 50 else "")
+            
+            await db.execute(
+                update(Conversation)
+                .where(Conversation.id == conversation_id)
+                .values(title=title)
+            )
         await db.commit()
         
-        yield f"data : {json.dumps({'type':'done'})}\n\n"
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
     except Exception as e:
         yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"

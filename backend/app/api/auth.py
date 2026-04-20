@@ -23,6 +23,7 @@ class AuthResponse(BaseModel):
     token_type: str = 'bearer'
     user_id : str
     email : str
+    full_name: str
     
 
 @router.post('/register')
@@ -52,7 +53,8 @@ async def register_user(payload: RegisterRequest, db = Depends(get_db)):
         access_token=token,
         token_type='bearer',
         user_id=user.id,
-        email=user.email
+        email=user.email,
+        full_name=user.full_name
     )
     
 @router.post('/login')
@@ -70,7 +72,8 @@ async def login_user(payload: LoginRequest, db = Depends(get_db)):
             access_token=token,
             token_type='bearer',
             user_id=user.id,
-            email=user.email
+            email=user.email,
+            full_name=user.full_name
         )
     else :
         raise HTTPException(
