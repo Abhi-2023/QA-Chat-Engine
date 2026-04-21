@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.services.documents_services import process_documents
 import hashlib, uuid, os
 
-type_list = ["application/pdf", "image/png", "image/jpeg"]
+type_list = ["application/pdf", "image/png", "image/jpeg", "image/jpg"]
 router = APIRouter(prefix='/file', tags=['files'])
 settings = get_settings()
 

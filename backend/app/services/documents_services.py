@@ -23,6 +23,11 @@ async def process_documents(file_id:str, user_id:str, db:AsyncSession):
         file_path = doc.file_path
         file_name = doc.filename
         
+        if doc.file_type != "application/pdf":
+            doc.status = "ready"
+            await db.commit()
+            return
+        
         doc.status = "Processing"
         await db.commit()
         
