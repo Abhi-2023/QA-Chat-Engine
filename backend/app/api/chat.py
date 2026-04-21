@@ -57,7 +57,7 @@ async def send_stream_response(body: ChatRequest, user=Depends(get_current_user)
     result = await db.execute(select(Message).where(Message.conversation_id == conversation_id).order_by(Message.created_at).limit(20))
     history = result.scalars().all()
     
-    return StreamingResponse(stream_chat_response(history, conversation_id, db), media_type="text/event-stream")
+    return StreamingResponse(stream_chat_response(history,conversation_id, user.id, db), media_type="text/event-stream")
 
 @router.get("/conversations")
 async def get_all_conversations(user=Depends(get_current_user), db:AsyncSession=Depends(get_db)):

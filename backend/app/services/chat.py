@@ -5,14 +5,23 @@ import json
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.models.conversation import Message, Conversation
 from sqlalchemy import select, update
+from backend.app.services.rag_services import retrieve_docs
 
 settings = get_settings()
 llm = ChatAnthropic(model="claude-sonnet-4-20250514", streaming=True, api_key=settings.ANTHROPIC_API_KEY)
 SYSTEM_PROMPT = "You are Nexus AI a helpful multimodel assistant, Be concise, accurate & generate response step by step wherever need"
+RAG_SYSTEM_PROMPT = """You are Nexus AI, a helpful assistant with access to uploaded documents.
 
+When document context is provided below, follow these rules:
+- Answer using the provided context
+- Cite your sources as [filename, Page X] after each claim
+- If the context doesn't contain the answer, say so clearly and answer from your general knowledge instead
+- Do not make up information that isn't in the context
 
-def format_history(messages: list[Message]) -> list:
-    formatted_message = [SystemMessage(content=SYSTEM_PROMPT)]
+{context}"""
+
+def format_history(messages: list[Message], system_prompt:str) -> list:
+    formatted_message = [SystemMessage(content=system_prompt)]
     
     for msg in messages:
         if msg.role == 'user':
@@ -22,10 +31,19 @@ def format_history(messages: list[Message]) -> list:
     
     return formatted_message
 
-async def stream_chat_response(messages, conversation_id, db: AsyncSession):
+async def stream_chat_response(messages, conversation_id, user_id, db: AsyncSession):
     try:
-        formatted = format_history(messages)
+        last_question = next((msg.content for msg in reversed(messages) if msg.role == "user"), "")
+        if chunks:= retrieve_docs(user_id, last_question):
+            context = build_context(chunks)
+            prompt = RAG_SYSTEM_PROMPT.format(context=context)
+        else:
+            prompt = SYSTEM_PROMPT
+            
+        formatted = format_history(messages, prompt)
+        
         full_response=""
+        
         async for chunk in llm.astream(formatted):
             full_response += chunk.content
             yield f"data: {json.dumps({'type': 'token', 'content': chunk.content})}\n\n"
@@ -53,3 +71,12 @@ async def stream_chat_response(messages, conversation_id, db: AsyncSession):
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
     except Exception as e:
         yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+
+
+def build_context(chunks : list[dict]) -> str:
+    sections = []
+    for chunk in chunks:
+        section = f"[{chunk['filename']}, Page {chunk['page']}]\n{chunk['content']}"
+        sections.append(section)
+        
+    return "\n---\n".join(sections)

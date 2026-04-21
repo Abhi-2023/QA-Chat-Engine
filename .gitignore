@@ -8,3 +8,5 @@ __pycache__/
 *.png
 *.jpeg
 *.video/*
+*.bin
+*.sqlite3
