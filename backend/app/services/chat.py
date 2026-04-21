@@ -126,7 +126,7 @@ async def stream_chat_response(
             )
         await db.commit()
 
-        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        yield f"data: {json.dumps({'type': 'done', 'conversation_id': conversation_id})}\n\n"
     except Exception as e:
         yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
 

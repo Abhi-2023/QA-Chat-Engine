@@ -69,7 +69,7 @@ async def process_documents(file_id:str, user_id:str, db:AsyncSession):
         await db.commit()
     except Exception as e:
         doc.status='failed'
-        db.commit
+        db.commit()
         print(f'Document Processing failed : {e}')
     
 def extract_text(file_path: str)-> list[dict]:

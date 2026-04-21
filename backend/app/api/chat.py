@@ -37,6 +37,7 @@ async def send_stream_response(body: ChatRequest, user=Depends(get_current_user)
         new_convo = Conversation(user_id = user.id)
         db.add(new_convo)
         await db.flush()
+        await db.commi()
         conversation_id=new_convo.id
     else :
         result = await db.execute(select(Conversation).where(Conversation.id == body.conversation_id, Conversation.user_id == user.id))
@@ -53,10 +54,11 @@ async def send_stream_response(body: ChatRequest, user=Depends(get_current_user)
     )
     db.add(user_msg)
     await db.flush()
+    await db.commit()
     
     result = await db.execute(select(Message).where(Message.conversation_id == conversation_id).order_by(Message.created_at).limit(20))
     history = result.scalars().all()
-    
+    await db.commit()
     return StreamingResponse(stream_chat_response(history,conversation_id, user.id, body.file_ids, db), media_type="text/event-stream")
 
 @router.get("/conversations")
