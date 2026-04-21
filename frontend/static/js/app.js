@@ -1,428 +1,438 @@
-const API_URL = "http://localhost:8001";
+const API = "http://localhost:8001";
 
 const state = {
-    token: localStorage.getItem("nexus_token") || "",
-    email: localStorage.getItem("nexus_email") || "",
-    fullName: localStorage.getItem("nexus_name") || "",
-    conversationId: null,
+    token: localStorage.getItem("nx_token") || "",
+    email: localStorage.getItem("nx_email") || "",
+    name: localStorage.getItem("nx_name") || "",
+    convoId: null,
     messages: [],
-    isStreaming: false,
-    currentMode: "chat",
-    menuConvoId: null,
+    streaming: false,
+    menuId: null,
+    files: [],
 };
 
-const $ = (sel) => document.querySelector(sel);
-const chatMessages = $("#chat-messages");
-const messageInput = $("#message-input");
-const sendBtn = $("#send-btn");
-const authError = $("#auth-error");
+const $ = (s) => document.querySelector(s);
+const chatEl = $("#chat-messages");
+const inputEl = $("#message-input");
+const sendEl = $("#send-btn");
+const errEl = $("#auth-error");
 
-// ── Init ──
 document.addEventListener("DOMContentLoaded", () => {
-    setupAuthTabs();
-    setupAuthForms();
-    setupChatInput();
-    setupModeSelector();
-    setupNewChat();
-    setupLogout();
-    document.addEventListener("click", closeAllDropdowns);
-    if (state.token) showLoggedInState();
+    initAuth();
+    initChat();
+    initFiles();
+    initSidebar();
+    document.addEventListener("click", () =>
+        document.querySelectorAll(".dropdown-menu").forEach((m) => m.remove())
+    );
+    if (state.token) showApp();
 });
 
-// ── Auth ──
-function setupAuthTabs() {
-    document.querySelectorAll(".auth-tab").forEach((tab) => {
-        tab.addEventListener("click", () => {
-            document.querySelectorAll(".auth-tab").forEach((t) => t.classList.remove("active"));
-            tab.classList.add("active");
-            const target = tab.dataset.tab;
-            $("#login-form").classList.toggle("hidden", target !== "login");
-            $("#register-form").classList.toggle("hidden", target !== "register");
-            authError.classList.add("hidden");
-        });
-    });
-}
-
-function setupAuthForms() {
-    $("#login-form").addEventListener("submit", async (e) => {
+// ═══════════ AUTH ═══════════
+function initAuth() {
+    document.querySelectorAll(".auth-tab").forEach((t) =>
+        t.addEventListener("click", () => {
+            document.querySelectorAll(".auth-tab").forEach((x) => x.classList.remove("active"));
+            t.classList.add("active");
+            const tab = t.dataset.tab;
+            $("#login-form").classList.toggle("hidden", tab !== "login");
+            $("#register-form").classList.toggle("hidden", tab !== "register");
+            errEl.classList.add("hidden");
+        })
+    );
+    $("#login-form").addEventListener("submit", (e) => {
         e.preventDefault();
-        await doAuth("login", {
-            email: $("#login-email").value,
-            password: $("#login-password").value,
-        });
+        auth("login", { email: $("#login-email").value, password: $("#login-password").value });
     });
-    $("#register-form").addEventListener("submit", async (e) => {
+    $("#register-form").addEventListener("submit", (e) => {
         e.preventDefault();
-        await doAuth("register", {
+        auth("register", {
             email: $("#register-email").value,
             password: $("#register-password").value,
             full_name: $("#register-name").value,
         });
     });
+    $("#logout-btn").addEventListener("click", logout);
 }
 
-async function doAuth(type, body) {
+async function auth(type, body) {
+    errEl.classList.add("hidden");
     try {
-        authError.classList.add("hidden");
-        const res = await fetch(`${API_URL}/auth/${type}`, {
+        const r = await fetch(`${API}/auth/${type}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
         });
-        const data = await res.json();
-        if (!res.ok) { showAuthError(data.detail || "Authentication failed"); return; }
-
-        state.token = data.access_token;
-        state.email = data.email;
-        state.fullName = body.full_name || data.email.split("@")[0];
-        localStorage.setItem("nexus_token", state.token);
-        localStorage.setItem("nexus_email", state.email);
-        localStorage.setItem("nexus_name", state.fullName);
-        showLoggedInState();
-    } catch (err) {
-        showAuthError("Connection failed. Is the backend running?");
+        const d = await r.json();
+        if (!r.ok) return showErr(d.detail || "Auth failed");
+        state.token = d.access_token;
+        state.email = d.email;
+        state.name = body.full_name || d.email.split("@")[0];
+        localStorage.setItem("nx_token", state.token);
+        localStorage.setItem("nx_email", state.email);
+        localStorage.setItem("nx_name", state.name);
+        showApp();
+    } catch {
+        showErr("Connection failed. Is the backend running?");
     }
 }
 
-function showAuthError(msg) {
-    authError.textContent = msg;
-    authError.classList.remove("hidden");
-}
+function showErr(m) { errEl.textContent = m; errEl.classList.remove("hidden"); }
 
-function showLoggedInState() {
+function showApp() {
     $("#auth-section").classList.add("hidden");
     $("#user-section").classList.remove("hidden");
-    const name = state.fullName || state.email.split("@")[0];
-    const initials = name.substring(0, 2).toUpperCase();
-    $("#user-avatar").textContent = initials;
-    $("#user-name").textContent = name;
+    const n = state.name || state.email.split("@")[0];
+    $("#user-avatar").textContent = n.substring(0, 2).toUpperCase();
+    $("#user-name").textContent = n;
     loadConversations();
 }
 
-function setupLogout() {
-    $("#logout-btn").addEventListener("click", () => {
-        state.token = "";
-        state.email = "";
-        state.fullName = "";
-        state.conversationId = null;
-        state.messages = [];
-        localStorage.removeItem("nexus_token");
-        localStorage.removeItem("nexus_email");
-        localStorage.removeItem("nexus_name");
-        $("#auth-section").classList.remove("hidden");
-        $("#user-section").classList.add("hidden");
-        $("#welcome-screen").classList.remove("hidden");
-        $("#chat-container").classList.add("hidden");
-        chatMessages.innerHTML = "";
-    });
+function logout() {
+    state.token = state.email = state.name = "";
+    state.convoId = null;
+    state.messages = [];
+    state.files = [];
+    localStorage.removeItem("nx_token");
+    localStorage.removeItem("nx_email");
+    localStorage.removeItem("nx_name");
+    $("#auth-section").classList.remove("hidden");
+    $("#user-section").classList.add("hidden");
+    $("#welcome-screen").classList.remove("hidden");
+    $("#chat-container").classList.add("hidden");
+    chatEl.innerHTML = "";
+    updateFilePreview();
 }
 
-// ── Conversations ──
+// ═══════════ CONVERSATIONS ═══════════
 async function loadConversations() {
     try {
-        const res = await fetch(`${API_URL}/chat/conversations`, {
-            headers: { Authorization: `Bearer ${state.token}` },
-        });
-        if (!res.ok) return;
-        const conversations = await res.json();
-        const list = $("#history-list");
-        list.innerHTML = "";
-        conversations.forEach((c) => {
-            const div = document.createElement("div");
-            div.className = "history-item" + (c.id === state.conversationId ? " active" : "");
-            div.dataset.id = c.id;
-            div.innerHTML = `
-                <span class="history-title">${escapeHtml(c.title || "New chat")}</span>
-                <button class="history-menu-btn" onclick="event.stopPropagation(); toggleMenu('${c.id}', this)">
+        const r = await fetch(`${API}/chat/conversations`, { headers: hdr() });
+        if (!r.ok) return;
+        const list = await r.json();
+        const el = $("#history-list");
+        el.innerHTML = "";
+        list.forEach((c) => {
+            const d = document.createElement("div");
+            d.className = "history-item" + (c.id === state.convoId ? " active" : "");
+            d.dataset.id = c.id;
+            d.innerHTML = `
+                <span class="history-title">${esc(c.title || "New chat")}</span>
+                <button class="history-menu-btn" onclick="event.stopPropagation();toggleMenu('${c.id}',this)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
-                </button>
-            `;
-            div.addEventListener("click", () => loadConversation(c.id));
-            list.appendChild(div);
+                </button>`;
+            d.addEventListener("click", () => loadConvo(c.id));
+            el.appendChild(d);
         });
-    } catch (err) {
-        console.error("Failed to load conversations:", err);
-    }
+    } catch (e) { console.error(e); }
 }
 
-async function loadConversation(id) {
+async function loadConvo(id) {
     try {
-        const res = await fetch(`${API_URL}/chat/conversations/${id}/messages`, {
-            headers: { Authorization: `Bearer ${state.token}` },
-        });
-        if (!res.ok) return;
-        const messages = await res.json();
-        state.conversationId = id;
-        state.messages = messages.map((m) => ({ role: m.role, content: m.content }));
-        renderAllMessages();
-        showChatView();
-        highlightActiveConvo();
-    } catch (err) {
-        console.error("Failed to load messages:", err);
-    }
+        const r = await fetch(`${API}/chat/conversations/${id}/messages`, { headers: hdr() });
+        if (!r.ok) return;
+        const msgs = await r.json();
+        state.convoId = id;
+        state.messages = msgs.map((m) => ({ role: m.role, content: m.content }));
+        renderAll();
+        showChat();
+        highlightConvo();
+    } catch (e) { console.error(e); }
 }
 
-function highlightActiveConvo() {
-    document.querySelectorAll(".history-item").forEach((item) => {
-        item.classList.toggle("active", item.dataset.id === state.conversationId);
-    });
+function highlightConvo() {
+    document.querySelectorAll(".history-item").forEach((i) =>
+        i.classList.toggle("active", i.dataset.id === state.convoId)
+    );
 }
 
-function setupNewChat() {
+function initSidebar() {
     $("#new-chat-btn").addEventListener("click", () => {
-        state.conversationId = null;
+        state.convoId = null;
         state.messages = [];
-        chatMessages.innerHTML = "";
+        state.files = [];
+        chatEl.innerHTML = "";
         $("#welcome-screen").classList.remove("hidden");
         $("#chat-container").classList.add("hidden");
-        highlightActiveConvo();
+        updateFilePreview();
+        highlightConvo();
     });
 }
 
-// ── Three-dot Menu ──
-function toggleMenu(convoId, btnEl) {
-    closeAllDropdowns();
-    state.menuConvoId = convoId;
-    const dropdown = document.createElement("div");
-    dropdown.className = "dropdown-menu";
-    dropdown.innerHTML = `
-        <button class="dropdown-item" onclick="openRenameDialog()">Rename</button>
-        <button class="dropdown-item danger" onclick="openDeleteDialog()">Delete</button>
-    `;
-    btnEl.parentElement.appendChild(dropdown);
-}
-
-function closeAllDropdowns() {
+function toggleMenu(id, btn) {
     document.querySelectorAll(".dropdown-menu").forEach((m) => m.remove());
+    state.menuId = id;
+    const dd = document.createElement("div");
+    dd.className = "dropdown-menu";
+    dd.innerHTML = `
+        <button class="dropdown-item" onclick="openRename()">Rename</button>
+        <button class="dropdown-item danger" onclick="openDelete()">Delete</button>`;
+    btn.parentElement.appendChild(dd);
+    event.stopPropagation();
 }
 
-// ── Rename ──
-function openRenameDialog() {
-    closeAllDropdowns();
-    const titleEl = document.querySelector(`.history-item[data-id="${state.menuConvoId}"] .history-title`);
-    $("#rename-input").value = titleEl ? titleEl.textContent : "";
+function openRename() {
+    document.querySelectorAll(".dropdown-menu").forEach((m) => m.remove());
+    const t = document.querySelector(`.history-item[data-id="${state.menuId}"] .history-title`);
+    $("#rename-input").value = t ? t.textContent : "";
     $("#rename-dialog").classList.remove("hidden");
     $("#rename-input").focus();
 }
-
-function closeRenameDialog() {
-    $("#rename-dialog").classList.add("hidden");
-}
-
+function closeRenameDialog() { $("#rename-dialog").classList.add("hidden"); }
 async function submitRename() {
-    const newTitle = $("#rename-input").value.trim();
-    if (!newTitle) return;
-    try {
-        const res = await fetch(`${API_URL}/chat/conversations/${state.menuConvoId}`, {
-            method: "PATCH",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${state.token}`,
-            },
-            body: JSON.stringify({ title: newTitle }),
-        });
-        if (res.ok) {
-            closeRenameDialog();
-            loadConversations();
-        }
-    } catch (err) {
-        console.error("Rename failed:", err);
-    }
+    const t = $("#rename-input").value.trim();
+    if (!t) return;
+    await fetch(`${API}/chat/conversations/${state.menuId}`, {
+        method: "PATCH", headers: { ...hdr(), "Content-Type": "application/json" },
+        body: JSON.stringify({ title: t }),
+    });
+    closeRenameDialog();
+    loadConversations();
 }
 
-// ── Delete ──
-function openDeleteDialog() {
-    closeAllDropdowns();
+function openDelete() {
+    document.querySelectorAll(".dropdown-menu").forEach((m) => m.remove());
     $("#delete-dialog").classList.remove("hidden");
 }
-
-function closeDeleteDialog() {
-    $("#delete-dialog").classList.add("hidden");
-}
-
+function closeDeleteDialog() { $("#delete-dialog").classList.add("hidden"); }
 async function submitDelete() {
-    try {
-        const res = await fetch(`${API_URL}/chat/conversations/${state.menuConvoId}`, {
-            method: "DELETE",
-            headers: { Authorization: `Bearer ${state.token}` },
-        });
-        if (res.ok) {
-            closeDeleteDialog();
-            if (state.conversationId === state.menuConvoId) {
-                state.conversationId = null;
-                state.messages = [];
-                chatMessages.innerHTML = "";
-                $("#welcome-screen").classList.remove("hidden");
-                $("#chat-container").classList.add("hidden");
-            }
-            loadConversations();
-        }
-    } catch (err) {
-        console.error("Delete failed:", err);
+    await fetch(`${API}/chat/conversations/${state.menuId}`, { method: "DELETE", headers: hdr() });
+    closeDeleteDialog();
+    if (state.convoId === state.menuId) {
+        state.convoId = null;
+        state.messages = [];
+        chatEl.innerHTML = "";
+        $("#welcome-screen").classList.remove("hidden");
+        $("#chat-container").classList.add("hidden");
     }
+    loadConversations();
 }
 
-// ── Chat Input ──
-function setupChatInput() {
-    messageInput.addEventListener("input", () => {
-        messageInput.style.height = "auto";
-        messageInput.style.height = Math.min(messageInput.scrollHeight, 160) + "px";
-        sendBtn.disabled = !messageInput.value.trim() || state.isStreaming;
+// ═══════════ FILES ═══════════
+function initFiles() {
+    const fileInput = $("#file-input");
+    $("#attach-btn").addEventListener("click", () => fileInput.click());
+
+    fileInput.addEventListener("change", async () => {
+        for (const file of fileInput.files) {
+            const formData = new FormData();
+            formData.append("file", file);
+            try {
+                const r = await fetch(`${API}/file/upload`, {
+                    method: "POST",
+                    headers: { Authorization: `Bearer ${state.token}` },
+                    body: formData,
+                });
+                if (!r.ok) {
+                    const err = await r.json();
+                    alert(err.detail || "Upload failed");
+                    continue;
+                }
+                const data = await r.json();
+                state.files.push({ id: data.file_id, name: file.name, type: file.type });
+            } catch {
+                alert("Upload failed. Is the backend running?");
+            }
+        }
+        fileInput.value = "";
+        updateFilePreview();
+        updateSendBtn();
     });
-    messageInput.addEventListener("keydown", (e) => {
+
+    const main = $(".main-content");
+    main.addEventListener("dragover", (e) => { e.preventDefault(); main.style.outline = "2px dashed var(--accent)"; });
+    main.addEventListener("dragleave", () => { main.style.outline = "none"; });
+    main.addEventListener("drop", (e) => {
+        e.preventDefault();
+        main.style.outline = "none";
+        if (e.dataTransfer.files.length) {
+            fileInput.files = e.dataTransfer.files;
+            fileInput.dispatchEvent(new Event("change"));
+        }
+    });
+}
+
+function updateFilePreview() {
+    const container = $("#attached-files");
+    if (state.files.length === 0) {
+        container.classList.add("hidden");
+        container.innerHTML = "";
+        return;
+    }
+    container.classList.remove("hidden");
+    container.innerHTML = state.files.map((f, i) => `
+        <div class="file-chip">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            ${esc(f.name)}
+            <button class="file-chip-remove" onclick="removeFile(${i})">×</button>
+        </div>
+    `).join("");
+}
+
+function removeFile(idx) {
+    state.files.splice(idx, 1);
+    updateFilePreview();
+    updateSendBtn();
+}
+
+// ═══════════ CHAT ═══════════
+function initChat() {
+    inputEl.addEventListener("input", () => {
+        inputEl.style.height = "auto";
+        inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + "px";
+        updateSendBtn();
+    });
+    inputEl.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
-            if (!sendBtn.disabled) sendMessage();
+            if (!sendEl.disabled) send();
         }
     });
-    sendBtn.addEventListener("click", sendMessage);
+    sendEl.addEventListener("click", send);
 }
 
-// ── Send Message ──
-async function sendMessage() {
-    const text = messageInput.value.trim();
-    if (!text || state.isStreaming) return;
+function updateSendBtn() {
+    sendEl.disabled = (!inputEl.value.trim() && state.files.length === 0) || state.streaming;
+}
 
-    showChatView();
-    state.messages.push({ role: "user", content: text });
-    appendMessage("user", text);
+async function send() {
+    const text = inputEl.value.trim();
+    if ((!text && state.files.length === 0) || state.streaming) return;
 
-    messageInput.value = "";
-    messageInput.style.height = "auto";
-    sendBtn.disabled = true;
-    state.isStreaming = true;
+    showChat();
 
-    const aiMsgEl = appendMessage("assistant", "");
-    const bubbleEl = aiMsgEl.querySelector(".msg-bubble");
-    bubbleEl.classList.add("streaming-cursor");
+    const fileNames = state.files.map((f) => f.name);
+    const fileIds = state.files.map((f) => f.id);
+    const displayText = text || `Uploaded: ${fileNames.join(", ")}`;
 
-    let fullResponse = "";
+    state.messages.push({ role: "user", content: displayText });
+    appendMsg("user", displayText, fileNames);
+
+    inputEl.value = "";
+    inputEl.style.height = "auto";
+    state.files = [];
+    updateFilePreview();
+    sendEl.disabled = true;
+    state.streaming = true;
+
+    const aiEl = appendMsg("assistant", "");
+    const bubble = aiEl.querySelector(".msg-bubble");
+    bubble.classList.add("streaming-cursor");
+
+    let full = "";
 
     try {
-        const res = await fetch(`${API_URL}/chat/send`, {
+        const r = await fetch(`${API}/chat/send`, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${state.token}`,
-            },
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${state.token}` },
             body: JSON.stringify({
-                message: text,
-                conversation_id: state.conversationId,
+                message: text || `Please analyze the uploaded file(s): ${fileNames.join(", ")}`,
+                conversation_id: state.convoId,
+                file_ids: fileIds.length > 0 ? fileIds : undefined,
             }),
         });
 
-        if (!res.ok) {
-            bubbleEl.textContent = "Error: " + (await res.text());
-            bubbleEl.classList.remove("streaming-cursor");
-            state.isStreaming = false;
+        if (!r.ok) {
+            bubble.textContent = "Error: " + (await r.text());
+            bubble.classList.remove("streaming-cursor");
+            state.streaming = false;
             return;
         }
 
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
+        const reader = r.body.getReader();
+        const dec = new TextDecoder();
+        let buf = "";
 
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop();
-
-            for (const line of lines) {
-                const trimmed = line.trim();
-                if (!trimmed.startsWith("data:")) continue;
-                const jsonStr = trimmed.substring(5).trim();
-                if (!jsonStr) continue;
+            buf += dec.decode(value, { stream: true });
+            const lines = buf.split("\n");
+            buf = lines.pop();
+            for (const ln of lines) {
+                const t = ln.trim();
+                if (!t.startsWith("data:")) continue;
+                const j = t.substring(5).trim();
+                if (!j) continue;
                 try {
-                    const data = JSON.parse(jsonStr);
-                    if (data.type === "token" && data.content) {
-                        fullResponse += data.content;
-                        bubbleEl.innerHTML = formatMarkdown(fullResponse);
-                    } else if (data.type === "done") {
-                        if (data.conversation_id) state.conversationId = data.conversation_id;
-                    } else if (data.type === "error") {
-                        bubbleEl.textContent = "Error: " + data.content;
+                    const d = JSON.parse(j);
+                    if (d.type === "token" && d.content) {
+                        full += d.content;
+                        bubble.innerHTML = md(full);
+                    } else if (d.type === "done") {
+                        if (d.conversation_id) state.convoId = d.conversation_id;
+                    } else if (d.type === "error") {
+                        bubble.textContent = "Error: " + d.content;
                     }
-                } catch (e) {}
+                } catch {}
             }
         }
-    } catch (err) {
-        bubbleEl.textContent = "Connection error. Is the backend running?";
+    } catch {
+        bubble.textContent = "Connection error. Is the backend running?";
     }
 
-    bubbleEl.classList.remove("streaming-cursor");
-    state.messages.push({ role: "assistant", content: fullResponse });
-    state.isStreaming = false;
-    sendBtn.disabled = !messageInput.value.trim();
+    bubble.classList.remove("streaming-cursor");
+    state.messages.push({ role: "assistant", content: full });
+    state.streaming = false;
+    updateSendBtn();
     loadConversations();
 }
 
-// ── Render Messages ──
-function appendMessage(role, content) {
+// ═══════════ RENDER ═══════════
+function appendMsg(role, content, files) {
     const div = document.createElement("div");
     div.className = `message ${role}`;
-
     const initials = role === "user"
-        ? (state.fullName || state.email).substring(0, 2).toUpperCase()
-        : "N";
+        ? (state.name || state.email).substring(0, 2).toUpperCase()
+        : "⚡";
+
+    let fileHTML = "";
+    if (files && files.length > 0) {
+        fileHTML = files.map((f) => `
+            <div class="msg-file">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                ${esc(f)}
+            </div>`).join("");
+    }
 
     div.innerHTML = `
         <div class="msg-avatar">${initials}</div>
-        <div class="msg-bubble">${content ? formatMarkdown(content) : '<div class="loading-dots"><span></span><span></span><span></span></div>'}</div>
-    `;
+        <div class="msg-bubble">${fileHTML}${content ? md(content) : '<div class="loading-dots"><span></span><span></span><span></span></div>'}</div>`;
 
-    chatMessages.appendChild(div);
+    chatEl.appendChild(div);
     $("#chat-container").scrollTop = $("#chat-container").scrollHeight;
     return div;
 }
 
-function renderAllMessages() {
-    chatMessages.innerHTML = "";
-    state.messages.forEach((msg) => {
-        if (msg.role === "user" || msg.role === "assistant") {
-            appendMessage(msg.role, msg.content);
-        }
+function renderAll() {
+    chatEl.innerHTML = "";
+    state.messages.forEach((m) => {
+        if (m.role === "user" || m.role === "assistant") appendMsg(m.role, m.content);
     });
 }
 
-function showChatView() {
+function showChat() {
     $("#welcome-screen").classList.add("hidden");
     $("#chat-container").classList.remove("hidden");
 }
 
-function sendQuickMessage(text) {
-    messageInput.value = text;
-    sendBtn.disabled = false;
-    sendMessage();
+function sendQuickMessage(t) { inputEl.value = t; updateSendBtn(); send(); }
+
+// ═══════════ UTILS ═══════════
+function hdr() { return { Authorization: `Bearer ${state.token}` }; }
+
+function md(t) {
+    let h = t;
+    h = h.replace(/```(\w*)\n([\s\S]*?)```/g, (_, l, c) => `<pre><code>${esc(c.trim())}</code></pre>`);
+    h = h.replace(/`([^`]+)`/g, "<code>$1</code>");
+    h = h.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    h = h.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+    h = h.replace(/\n\n/g, "</p><p>");
+    h = h.replace(/\n/g, "<br>");
+    return `<p>${h}</p>`;
 }
 
-// ── Mode Selector ──
-function setupModeSelector() {
-    document.querySelectorAll(".mode-item").forEach((btn) => {
-        btn.addEventListener("click", () => {
-            document.querySelectorAll(".mode-item").forEach((b) => b.classList.remove("active"));
-            btn.classList.add("active");
-            state.currentMode = btn.dataset.mode;
-        });
-    });
-}
-
-// ── Markdown ──
-function formatMarkdown(text) {
-    let html = text;
-    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
-        `<pre><code>${escapeHtml(code.trim())}</code></pre>`
-    );
-    html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
-    html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-    html = html.replace(/\*([^*]+)\*/g, "<em>$1</em>");
-    html = html.replace(/\n\n/g, "</p><p>");
-    html = html.replace(/\n/g, "<br>");
-    return `<p>${html}</p>`;
-}
-
-function escapeHtml(str) {
-    const map = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" };
-    return str.replace(/[&<>"']/g, (c) => map[c]);
+function esc(s) {
+    const m = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" };
+    return s.replace(/[&<>"']/g, (c) => m[c]);
 }

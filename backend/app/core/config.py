@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     ALGORITHM: str = 'HS256'
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     ANTHROPIC_API_KEY: str
+    UPLOAD_DIR: str = "./uploads"
+    MAX_FILE_SIZE_MB: int = 50
+    CHROMA_DIR: str = "./chroma_data"
     
     class Config:
         env_file = '.env'

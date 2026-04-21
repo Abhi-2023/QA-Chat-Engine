@@ -13,6 +13,7 @@ router = APIRouter(prefix='/chat', tags=['chat'])
 class ChatRequest(BaseModel):
     message : str
     conversation_id :str | None = None
+    file_id :str | None = None
     
 class RenameRequest(BaseModel):
     title:str
