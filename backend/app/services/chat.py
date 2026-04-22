@@ -117,7 +117,7 @@ async def stream_chat_response(
         if len(messages) <= 1:  # first message in conversation
             # Use first 50 chars of user's message as title
             first_msg = messages[0].content if messages else "New chat"
-            title = first_msg[:50] + ("..." if len(first_msg) > 50 else "")
+            title = first_msg[:50] + ("..." if len(first_msg) > 20 else "")
 
             await db.execute(
                 update(Conversation)
