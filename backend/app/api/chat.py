@@ -37,7 +37,7 @@ async def send_stream_response(body: ChatRequest, user=Depends(get_current_user)
         new_convo = Conversation(user_id = user.id)
         db.add(new_convo)
         await db.flush()
-        await db.commi()
+        await db.commit()
         conversation_id=new_convo.id
     else :
         result = await db.execute(select(Conversation).where(Conversation.id == body.conversation_id, Conversation.user_id == user.id))
