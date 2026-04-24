@@ -45,20 +45,10 @@ async def stream_chat_response(
     messages, conversation_id, user_id, file_ids, db: AsyncSession
 ):
     try:
-        last_question = next(
-            (msg.content for msg in reversed(messages) if msg.role == "user"), ""
-        )
-        if chunks := retrieve_docs(user_id, last_question):
-            context = build_context(chunks)
-            prompt = RAG_SYSTEM_PROMPT.format(context=context)
-        else:
-            prompt = SYSTEM_PROMPT
-
-        formatted = format_history(messages, prompt)
-
+        file_types=[]
+        image_blocks = []
         # Step 1 — Check if any file_ids were sent with this message
         if file_ids:
-            image_blocks = []  # will collect image content blocks
 
             # Step 2 — Loop through each file_id, load from database
             for fid in file_ids:
@@ -67,7 +57,7 @@ async def stream_chat_response(
 
                 # Step 3 — Is this file an image? (not a PDF)
                 if doc and doc.file_type in ("image/png", "image/jpeg"):
-
+                    file_types.append(doc.file_type)
                     # Step 4 — Read the image file from disk and convert to base64
                     b64 = load_image_as_base64(doc.file_path)
 
@@ -83,24 +73,33 @@ async def stream_chat_response(
                         }
                     )
 
-            # Step 6 — If we found any images, modify the last message
-            if image_blocks:
-                last_msg = (
-                    formatted.pop()
-                )  # removes: HumanMessage("What's in this image?")
+        last_question = next(
+            (msg.content for msg in reversed(messages) if msg.role == "user"), ""
+        )
+        prompt = SYSTEM_PROMPT
+        if not file_types:
+            if chunks := retrieve_docs(user_id, last_question):
+                context = build_context(chunks)
+                prompt = RAG_SYSTEM_PROMPT.format(context=context)
 
-                formatted.append(
-                    HumanMessage(
-                        content=[
-                            *image_blocks,  # image block(s) first
-                            {
-                                "type": "text",
-                                "text": last_msg.content,
-                            },  # then the text question
-                        ]
-                    )
+        formatted = format_history(messages, prompt)
+        if image_blocks:
+            last_msg = (
+                formatted.pop()
+            )  # removes: HumanMessage("What's in this image?")
+
+            formatted.append(
+                HumanMessage(
+                    content=[
+                        *image_blocks,  # image block(s) first
+                        {
+                            "type": "text",
+                            "text": last_msg.content,
+                        },  # then the text question
+                    ]
                 )
-                # Now the last message has both the image AND the text
+            )
+            # Now the last message has both the image AND the text
 
         full_response = ""
 
@@ -117,7 +116,7 @@ async def stream_chat_response(
         if len(messages) <= 1:  # first message in conversation
             # Use first 50 chars of user's message as title
             first_msg = messages[0].content if messages else "New chat"
-            title = first_msg[:50] + ("..." if len(first_msg) > 20 else "")
+            title = first_msg[:20] + ("..." if len(first_msg) > 20 else "")
 
             await db.execute(
                 update(Conversation)

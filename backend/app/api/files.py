@@ -5,7 +5,7 @@ from backend.app.core.auth import get_current_user
 from backend.app.core.database import get_db
 from backend.app.models.documents import Document
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.app.services.documents_services import process_documents
+from backend.app.services.documents_services import process_files
 import hashlib, uuid, os
 
 type_list = ["application/pdf", "image/png", "image/jpeg", "image/jpg"]
@@ -62,7 +62,7 @@ async def file_upload(file: UploadFile = File(...), user=Depends(get_current_use
     
     await db.commit()
     
-    await process_documents(new_file.id, user.id, db)
+    await process_files(new_file.id, user.id, file_type, db)
     
     return {"file_id": new_file.id}
             

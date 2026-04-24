@@ -14,6 +14,19 @@ splitter = RecursiveCharacterTextSplitter(
 
 collection = get_chroma_collection()
 
+async def process_files(file_id: str,  user_id:str, file_type:str, db:AsyncSession ):
+    if file_type == 'application/pdf':
+        await process_documents(file_id=file_id, user_id= user_id, db= db)
+    elif file_type in {'image/jpeg', 'image/png', 'image/jpg'}:
+        await process_image(file_id, user_id, db)
+    
+async def process_image(file_id: str, user_id: str, db: AsyncSession):
+    result = await db.execute(select(Document).where(Document.id == file_id, Document.user_id == user_id))
+    if (image := result.scalar_one_or_none()):
+        image.status = 'ready'
+        await db.commit()
+        
+
 async def process_documents(file_id:str, user_id:str, db:AsyncSession):
     doc_result = await db.execute(select(Document).where(Document.id == file_id, Document.user_id == user_id))
     doc = doc_result.scalar_one_or_none()
@@ -22,11 +35,6 @@ async def process_documents(file_id:str, user_id:str, db:AsyncSession):
     try:
         file_path = doc.file_path
         file_name = doc.filename
-        
-        if doc.file_type != "application/pdf":
-            doc.status = "ready"
-            await db.commit()
-            return
         
         doc.status = "Processing"
         await db.commit()
@@ -69,7 +77,7 @@ async def process_documents(file_id:str, user_id:str, db:AsyncSession):
         await db.commit()
     except Exception as e:
         doc.status='failed'
-        db.commit()
+        await db.commit()
         print(f'Document Processing failed : {e}')
     
 def extract_text(file_path: str)-> list[dict]:
