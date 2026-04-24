@@ -1,7 +1,23 @@
 services:
+  app:
+    build: .
+    container_name: nexus_app
+    ports:
+      - "8001:8001"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://nexus:nexus_dev_123@db:5433/nexus_ai
+    volumes:
+      - ./uploads:/app/uploads
+      - ./chroma_data:/app/chroma_data
+    depends_on:
+      - db
+      - redis
+
   db:
     image: pgvector/pgvector:pg16
-    container_name: nexus-db
+    container_name: nexus_db
     environment:
       POSTGRES_USER: nexus
       POSTGRES_PASSWORD: nexus_dev_123
@@ -10,10 +26,12 @@ services:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+
   redis:
     image: redis:7-alpine
-    container_name: nexus-redis
+    container_name: nexus_redis
     ports:
       - "6379:6379"
+
 volumes:
   pgdata:

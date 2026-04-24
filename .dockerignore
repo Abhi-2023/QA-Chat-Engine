@@ -1,0 +1,10 @@
+myvenv/
+myvenv/
+__pycache__/
+*.pyc
+.env
+uploads/
+chroma_data/
+.vscode/
+.git/
+*.md

@@ -12,3 +12,6 @@ __pycache__/
 *.bin
 *.sqlite3
 *.mp3
+uploads/
+chroma_data/
+.vscode/
