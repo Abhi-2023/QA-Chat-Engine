@@ -3,6 +3,7 @@ import re
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from backend.app.core.chroma import get_chroma_collection
 from backend.app.services.embedding_service import embed_batch
+from backend.app.services.video_services import process_video
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from backend.app.models.documents import Document
@@ -19,7 +20,10 @@ async def process_files(file_id: str,  user_id:str, file_type:str, db:AsyncSessi
         await process_documents(file_id=file_id, user_id= user_id, db= db)
     elif file_type in {'image/jpeg', 'image/png', 'image/jpg'}:
         await process_image(file_id, user_id, db)
-    
+    else :
+        process_video(file_id, user_id, db)
+        
+
 async def process_image(file_id: str, user_id: str, db: AsyncSession):
     result = await db.execute(select(Document).where(Document.id == file_id, Document.user_id == user_id))
     if (image := result.scalar_one_or_none()):

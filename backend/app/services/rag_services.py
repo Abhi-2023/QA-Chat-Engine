@@ -3,9 +3,22 @@ from backend.app.core.chroma import get_chroma_collection
 
 collections = get_chroma_collection()
 
-def retrieve_docs(user_id: str, query : str, top_k : int=5) -> list[dict]:
+def retrieve_docs(user_id: str, query : str, file_ids:list, top_k : int=5) -> list[dict]:
     vector_query = embed_text(query)
-    results = collections.query(query_embeddings=[vector_query], n_results=top_k, where={'user_id': user_id})
+    # Build the filter
+    if file_ids:
+        where_filter = {"$and": [
+            {"user_id": user_id},
+            {"file_id": {"$in": file_ids}}
+        ]}
+    else:
+        where_filter = {"user_id": user_id}
+    
+    results = collections.query(
+        query_embeddings=[vector_query],
+        n_results=top_k,
+        where=where_filter
+    )
     if not results or not results['documents'][0]:
         return []
     return [

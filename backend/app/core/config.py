@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./uploads"
     MAX_FILE_SIZE_MB: int = 50
     CHROMA_DIR: str = "./chroma_data"
+    WHISPER_MODEL :str = "base"
     
     class Config:
         env_file = '.env'

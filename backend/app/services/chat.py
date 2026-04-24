@@ -78,7 +78,7 @@ async def stream_chat_response(
         )
         prompt = SYSTEM_PROMPT
         if not file_types:
-            if chunks := retrieve_docs(user_id, last_question):
+            if chunks := retrieve_docs(user_id, last_question, file_ids):
                 context = build_context(chunks)
                 prompt = RAG_SYSTEM_PROMPT.format(context=context)
 

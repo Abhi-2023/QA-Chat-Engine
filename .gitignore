@@ -11,3 +11,4 @@ __pycache__/
 *.video/*
 *.bin
 *.sqlite3
+*.mp3
